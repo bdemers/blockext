@@ -67,28 +67,36 @@ def GetRequestHandlerFactory(app):
 
 class GetRequestHandler(BaseHTTPRequestHandler):
     def log_message(self, format_, *args):
-        if args[0].startswith(native("GET /poll")):
+        if isinstance(args[0], str) and \
+                args[0].startswith(native("GET {self.app.descriptor.context_path}/poll".format(**vars()))):
             return
         return BaseHTTPRequestHandler.log_message(self, format_, *args)
 
     def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers",
-                         "X-Requested-With, X-Application")
-        self.end_headers()
+        if not self.app.descriptor.secure:
+            self.send_response(200)
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Headers",
+                             "X-Requested-With, X-Application")
+            self.end_headers()
 
     def do_GET(self):
-        args = self.path.split("/")
-        args = list(map(unquote, args))
-        assert args.pop(0) == "" # since path starts with a slash
-        response = self.app.get_response(*args)
+        context_path = self.app.descriptor.context_path
+        if self.path.startswith(context_path):
+            rel_path = self.path.replace(context_path, "", 1)
+            args = rel_path.split("/")
+            args = list(map(unquote, args))
+            assert args.pop(0) == "" # since path starts with a slash
+            kwargs = {"host": self.headers.getheader("host")}
+            response = self.app.get_response(*args, **kwargs)
 
-        self.send_response(response.status)
-        for k, v in response.headers.items():
-            self.send_header(k, str(v))
-        self.end_headers()
-        self.wfile.write(native(response.content))
+            self.send_response(response.status)
+            for k, v in response.headers.items():
+                self.send_header(k, str(v))
+            self.end_headers()
+            self.wfile.write(native(response.content))
+        else:
+            self.send_error(404, "Not found [%s]" % self.path)
 
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):

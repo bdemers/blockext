@@ -25,8 +25,8 @@ class Program(object):
         return fmt.format(**locals())
 
     @classmethod
-    def generate_file(cls, descriptor, language):
-        raise NotImplementedError(self)
+    def generate_file(cls, descriptor, language, host=None):
+        raise NotImplementedError(object)
 
 
 
@@ -45,7 +45,7 @@ class ScratchProgram(Program):
     file_extension = "s2e"
 
     @classmethod
-    def generate_file(cls, descriptor, language):
+    def generate_file(cls, descriptor, language, host=None):
         s2e = {
             "extensionName": descriptor.name,
             "extensionPort": descriptor.port,
@@ -87,21 +87,24 @@ class SnapProgram(Program):
     content_type = "application/xml"
 
     @classmethod
-    def generate_file(cls, descriptor, language):
-        return generate_snap(descriptor, language)
+    def generate_file(cls, descriptor, language, host=None):
+        return generate_snap(descriptor, language, host)
 
-def generate_snap(descriptor, language):
+def generate_snap(descriptor, language, host=None):
     root = Element("blocks", {
         "app": "Snap! 4.0, http://snap.berkeley.edu",
         "version": "1",
     })
+
+    if not host:
+        host = "localhost:{descriptor.port}".format(**vars())
 
     menus = language.get_menus(descriptor.menus)
 
     for block in descriptor.blocks:
         defn = SubElement(root, "block-definition", {
             "type": "%s" % block.shape, # Can't use a future.builtins.str
-            "category": "other",
+            "category": block.category,
         })
 
         if block.help_text:
@@ -139,7 +142,7 @@ def generate_snap(descriptor, language):
         http_block = Element("block", s="reportURL")
         join_block = SubElement(http_block, "block", s="reportJoinWords")
         list_ = SubElement(join_block, "list")
-        url = "localhost:{descriptor.port}/{block.selector}".format(**vars())
+        url = "{host}{descriptor.context_path}/{block.selector}".format(**vars())
         if block.is_blocking:
             url += "/-" # Blank request id
         SubElement(list_, "l").text = url

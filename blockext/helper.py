@@ -29,7 +29,7 @@ class HelperApp(object):
         self.helper_cls = helper_cls
         self.helper = helper_cls()
 
-    def get_response(self, selector=None, *args):
+    def get_response(self, selector=None, *args, **kwargs):
         if not self.ensure_connected():
             return Response("")
 
@@ -39,7 +39,7 @@ class HelperApp(object):
         func_name = "handle_" + selector
         func = getattr(self, func_name, None)
         if func:
-            return func(*args)
+            return func(*args, **kwargs)
         else:
             return self.handle(selector, *args)
 
@@ -127,11 +127,11 @@ class HelperApp(object):
 
         return Response("""\
         <!doctype html>
-        <p><a href="/_generate_blocks/scratch">Download Scratch 2 extension file</a>
-        <p><a href="/_generate_blocks/snap">Download Snap! blocks</a>
-        """, content_type="text/html")
+        <p><a href="{self.descriptor.context_path}/_generate_blocks/scratch">Download Scratch 2 extension file</a>
+        <p><a href="{self.descriptor.context_path}/_generate_blocks/snap">Download Snap! blocks</a>
+        """.format(**vars()), content_type="text/html")
 
-    def handle__generate_blocks(self, program_name, language_code="en", filename=None):
+    def handle__generate_blocks(self, program_name, language_code="en", filename=None, host=None):
         if not self.debug:
             return NotFound()
 
@@ -141,14 +141,15 @@ class HelperApp(object):
         if not filename:
             filename = program.get_filename(self.descriptor, language_code)
             new_path = "/".join((
-                "/_generate_blocks",
+                self.descriptor.context_path,
+                "_generate_blocks",
                 quote(program_name),
                 quote(language_code),
                 quote(filename))
             )
             return Redirect(new_path)
 
-        return Download(program.generate_file(self.descriptor, language),
+        return Download(program.generate_file(self.descriptor, language, host),
                         program.content_type)
 
 
@@ -208,6 +209,9 @@ class Extension(object):
         self.descriptor = descriptor
         """Information about the extension."""
 
+        self.server = None
+        """sever for use in run_forever and stop"""
+
         deprecated_blocks = deprecated_blocks or []
         self._blocks_by_selector = {}
         for block in descriptor.blocks + deprecated_blocks:
@@ -222,10 +226,13 @@ class Extension(object):
             self._blocks_by_selector[block.selector] = block
 
     def run_forever(self, debug=False):
-        host = "localhost"
         app = HelperApp(self.helper_cls, self._blocks_by_selector,
                         self.descriptor, debug)
-        server = Server(app, host, self.descriptor.port)
-        print("Listening on {host}:{self.descriptor.port}".format(**vars()))
-        server.serve_forever()
+        self.server = Server(app, self.descriptor.listen_addresses, self.descriptor.port)
+        print("Listening on {self.descriptor.listen_addresses}:{self.descriptor.port}".format(**vars()))
+        self.server.serve_forever()
 
+    def stop(self):
+        if self.server:
+            print("Shutting down server")
+            self.server.shutdown()

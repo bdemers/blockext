@@ -32,7 +32,7 @@ class Example:
         print(text)
         time.sleep(duration)
 
-    @command("play note %n")
+    @command("play note %n", category="music")
     def play_note(self, note):
         print("DING {note}".format(note=note))
         time.sleep(2)

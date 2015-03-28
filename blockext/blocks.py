@@ -11,7 +11,7 @@ class Block(object):
     _highest_id = 0
 
     def __init__(self, selector, shape, parts_or_spec, is_blocking=False,
-            help_text="", defaults=[]):
+            help_text="", defaults=[], category="other"):
         self.shape = str(shape)
         """A string determining the kind of values the block reports.
 
@@ -41,6 +41,8 @@ class Block(object):
         """Text explaining the block to a Scratch user."""
 
         self.translations = {}
+
+        self.category = category
 
     @property
     def inputs(self):
@@ -228,9 +230,15 @@ class Language(object):
 
 
 class Descriptor(object):
-    def __init__(self, name, port, blocks, menus=None, translations=None):
+    def __init__(self, name, port, blocks, menus=None, translations=None, listen_addresses="localhost", context_path="/"):
         self.name = str(name)
         """Human-readable name of the hardware."""
+
+        self.listen_addresses = listen_addresses
+        """The server_address to listen on"""
+
+        self.context_path = context_path
+        """ The root of the url """
 
         self.port = int(port)
         """Port the extension runs on."""
